@@ -91,6 +91,12 @@ def main():
     currency = q.get("currency") or ""
     market_ts = q.get("regularMarketTime")
 
+    # 新增：避免 chg/chg_pct 為 None 時格式化爆掉
+    if chg is None or chg_pct is None:
+        chg_line = "漲跌：N/A"
+    else:
+        chg_line = f"漲跌：{float(chg):+.2f}（{float(chg_pct):+.2f}%）"
+
     if market_ts:
         tpe_time = datetime.fromtimestamp(market_ts, tz=TZ).strftime("%Y-%m-%d %H:%M:%S")
     else:
@@ -102,7 +108,7 @@ def main():
         "📈 Yahoo 即時股價（每 5 分鐘自動回報）\n"
         f"標的：{name} ({symbol})\n"
         f"價格：{price} {currency}\n"
-        f"漲跌：{chg:+.2f}（{chg_pct:+.2f}%）\n"
+        f"{chg_line}\n"
         f"時間：{tpe_time}（台北）\n"
         f"來源：{link}"
     )
