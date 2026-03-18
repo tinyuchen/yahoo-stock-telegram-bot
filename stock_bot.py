@@ -67,15 +67,26 @@ def fetch_yahoo_quote(symbol: str) -> dict:
     }
 
 def send_telegram(text: str):
-    # Telegram sendMessage API :contentReference[oaicite:6]{index=6}
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+
+    chat_id = (TELEGRAM_CHAT_ID or "").strip()
+    # 如果是純數字（含負號）就轉 int，避免字串帶空白造成 Bad Request
+    if chat_id.lstrip("-").isdigit():
+        chat_id = int(chat_id)
+
     payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
+        "chat_id": chat_id,
         "text": text,
         "disable_web_page_preview": True
     }
+
     r = requests.post(url, json=payload, timeout=20)
-    r.raise_for_status()
+
+    # 讓 Actions log 顯示 Telegram 的錯誤原因
+    if not r.ok:
+        raise RuntimeError(f"Telegram error {r.status_code}: {r.text}")
+
+    return r.json()
 
 def main():
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
