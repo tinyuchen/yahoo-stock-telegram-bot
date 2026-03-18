@@ -18,18 +18,53 @@ def pick_random_symbol() -> str:
     return random.choice(SYMBOLS)
 
 def fetch_yahoo_quote(symbol: str) -> dict:
-    # Yahoo Finance quote endpoint（非官方，但常用且回 JSON）:contentReference[oaicite:5]{index=5}
-    url = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1m&range=1d"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (compatible; StockBot/1.0)"
-    }
-    r = requests.get(url, params={"symbols": symbol}, headers=headers, timeout=20)
+    """
+    用 Yahoo chart JSON 端點抓即時價（較不易被 v7/quote 擋 401）
+    """
+    session = requests.Session()
+    session.headers.update({
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Accept": "application/json,text/plain,*/*",
+        "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+        "Referer": f"https://finance.yahoo.com/quote/{symbol}",
+    })
+
+    # 先 warm up 一下 cookies（有時有助於避免被擋）
+    session.get(f"https://finance.yahoo.com/quote/{symbol}", timeout=20)
+
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+    params = {"interval": "1m", "range": "1d"}
+
+    r = session.get(url, params=params, timeout=20)
     r.raise_for_status()
     j = r.json()
-    result = j.get("quoteResponse", {}).get("result", [])
+
+    result = (j.get("chart", {}) or {}).get("result", [])
     if not result:
-        raise RuntimeError(f"No quote result for symbol={symbol}")
-    return result[0]
+        raise RuntimeError(f"No chart result for symbol={symbol}: {j}")
+
+    meta = result[0].get("meta", {}) or {}
+    price = meta.get("regularMarketPrice")
+    prev_close = meta.get("previousClose")
+    ts = meta.get("regularMarketTime")
+    currency = meta.get("currency", "")
+
+    # 計算漲跌與漲跌幅（如果 previousClose 存在）
+    chg = None
+    chg_pct = None
+    if price is not None and prev_close:
+        chg = float(price) - float(prev_close)
+        chg_pct = (chg / float(prev_close)) * 100.0
+
+    return {
+        "symbol": symbol,
+        "shortName": meta.get("symbol", symbol),
+        "regularMarketPrice": price,
+        "regularMarketChange": chg,
+        "regularMarketChangePercent": chg_pct,
+        "regularMarketTime": ts,
+        "currency": currency,
+    }
 
 def send_telegram(text: str):
     # Telegram sendMessage API :contentReference[oaicite:6]{index=6}
