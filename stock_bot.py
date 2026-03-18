@@ -19,7 +19,7 @@ def pick_random_symbol() -> str:
 
 def fetch_yahoo_quote(symbol: str) -> dict:
     # Yahoo Finance quote endpoint（非官方，但常用且回 JSON）:contentReference[oaicite:5]{index=5}
-    url = "https://query1.finance.yahoo.com/v7/finance/quote"
+    url = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1m&range=1d"
     headers = {
         "User-Agent": "Mozilla/5.0 (compatible; StockBot/1.0)"
     }
